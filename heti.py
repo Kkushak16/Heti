@@ -13,15 +13,28 @@ import time
 import subprocess
 import webbrowser
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/.."))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
 
-from Heti.config.safe_io import setup_safe_io, safe_print
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+try:
+    from Heti.config.safe_io import setup_safe_io, safe_print
+    from Heti.agent.core_agent import HetiAgent
+    from Heti.tools.system_tools import get_default_tools
+    from Heti.voice.pipeline import FullVoiceLoopPipeline
+    from Heti.gesture.controller import get_gesture_controller
+except ImportError:
+    from config.safe_io import setup_safe_io, safe_print
+    from agent.core_agent import HetiAgent
+    from tools.system_tools import get_default_tools
+    from voice.pipeline import FullVoiceLoopPipeline
+    from gesture.controller import get_gesture_controller
+
 setup_safe_io()
-
-from Heti.agent.core_agent import HetiAgent
-from Heti.tools.system_tools import get_default_tools
-from Heti.voice.pipeline import FullVoiceLoopPipeline
-from Heti.gesture.controller import get_gesture_controller
 
 
 class HetiBridgeAPI:
