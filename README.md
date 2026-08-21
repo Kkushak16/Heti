@@ -1,23 +1,42 @@
 # 🤖 Heti — AI Desktop Assistant & Handless Gesture Control System
 
-**Heti** is an intelligent, modular AI desktop assistant for Windows. It features hands-free interaction through **webcam-based 3D hand gesture tracking** ("Handless Mode"), real-time **voice command automation**, local LLM integration (Ollama), and native system control tools.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![MediaPipe Tracking](https://img.shields.io/badge/MediaPipe-21_Hand_Landmarks-green.svg)](https://google.github.io/mediapipe/)
+[![OpenCV Powered](https://img.shields.io/badge/OpenCV-Computer_Vision-orange.svg)](https://opencv.org/)
+[![License Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Platform Windows](https://img.shields.io/badge/platform-Windows_10%2F11-0078D6.svg)](https://microsoft.com/windows)
+
+**Heti** is a privacy-first, high-performance AI desktop assistant and hands-free computer vision controller for Windows. It features **webcam 3D hand landmark gesture tracking** ("Handless Mode"), real-time **voice command automation**, local LLM execution via Ollama, and instant OS automation.
+
+> **SEO Keywords:** `hand gesture control`, `mediapipe cursor control`, `voice AI assistant python`, `handless mode computer vision`, `desktop gesture navigation`, `local AI assistant`.
+
+---
+
+## 📑 Table of Contents
+- [✨ Key Features](#-key-features)
+- [🖐️ Handless Mode Gesture Reference](#️-handless-mode-gesture-reference)
+- [📁 Repository Structure](#-repository-structure)
+- [🚀 Getting Started](#-getting-started)
+- [🎙️ Voice Commands](#️-voice-commands)
+- [🔒 Privacy & Security Audit](#-privacy--security-audit)
+- [📜 Attributions & License](#-attributions--license)
 
 ---
 
 ## ✨ Key Features
 
-* 🖐️ **Handless Mode (Camera Gesture Control):** Control your desktop cursor, mouse clicks, drag & drop, scrolling, and zooming using natural hand gestures captured by your webcam—100% locally with zero cloud streaming.
-* 🎙️ **Voice AI Pipeline:** Speech-to-Text (STT) and Text-to-Speech (TTS) integration with passive wake-word standby ("Hey Heti"), a 2-stage active listening window, and zero intrusive repetitive audio loops.
+* 🖐️ **Handless Mode (Webcam Gesture Control):** Control your desktop cursor, mouse clicks, drag & drop, scrolling, and zooming using natural hand gestures captured by your webcam—100% locally in RAM with zero cloud video streaming.
+* 🎙️ **Voice AI Pipeline:** Speech-to-Text (STT) and Text-to-Speech (TTS) integration with passive wake-word standby ("Hey Heti"), a 2-stage active listening window, and zero intrusive audio feedback loops.
 * ⚡ **Fast-Path Intent Automation:** Sub-15ms execution for local OS actions (launching Chrome, Edge, Firefox, Explorer, direct website navigation, and system status queries).
 * 🔔 **System Tray Integration:** Persistent background daemon (`pystray`) offering one-click toggles for Voice Listening and Handless Mode.
-* 🌐 **WebSocket & Web App Bridge:** Real-time event broadcasting server (`ws://127.0.0.1:8765`) enabling web applications (such as [Ekam](https://github.com/Kkushak16/Ekam)) to render live gesture status and cursor telemetry.
-* 🔒 **Privacy First:** All vision processing and voice inference are processed locally in RAM; webcam video feeds are never saved to disk or uploaded externally.
+* 🌐 **WebSocket & Web App Bridge:** Real-time event broadcasting server (`ws://127.0.0.1:8765`) enabling web applications (such as [Ekam](https://github.com/Kkushak16/Ekam)) to render live gesture telemetry and status indicators.
+* 🔒 **Zero Data Leakage:** Video frames and voice inputs stay 100% on-device. No telemetry or secret tokens are stored or sent across external networks.
 
 ---
 
 ## 🖐️ Handless Mode Gesture Reference
 
-Handless Mode relies on a 21-point MediaPipe hand landmark tracking engine with temporal debouncing, priority state resolution, and Exponential Moving Average (EMA) cursor smoothing:
+Handless Mode relies on a 21-point MediaPipe hand landmark tracking engine with temporal candidate debouncing, priority state resolution, and Exponential Moving Average (EMA) cursor smoothing:
 
 | Gesture Pose | Hand Configuration | Action Executed |
 | :--- | :--- | :--- |
@@ -95,6 +114,14 @@ Once Heti is active, say **"Hey Heti"** followed by any of these commands:
 * *"Check gesture status"* — Speaks and displays active gesture FPS and state.
 * *"Open Google Chrome"* / *"Open File Explorer"* — Launches system applications directly.
 * *"Open youtube.com"* / *"Go to github.com"* — Navigates directly to domains in default browser.
+
+---
+
+## 🔒 Privacy & Security Audit
+
+- **Zero Credential Storage:** `.gitignore` strictly blocks `.env`, keys, credentials, tokens, and database files.
+- **Local In-Memory Video:** Frames are processed frame-by-frame in RAM and released immediately.
+- **No Remote Telemetry:** All communication stays on local loopback interface (`127.0.0.1`).
 
 ---
 
