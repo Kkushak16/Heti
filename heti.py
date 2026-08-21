@@ -4,6 +4,10 @@ Main desktop GUI application entry point for Heti.
 
 Launches the Heti Desktop UI (heti_ui.html) inside a native window
 with full real-time bindings to Heti's Voice Pipeline and Handless Gesture Engine.
+
+NOTE: This file must be imported/run from the PARENT directory (d:\\Antigravity)
+      so that 'from Heti.xxx' package imports resolve correctly.
+      Use run_heti.py or the Start Heti.vbs launcher.
 """
 
 import os
@@ -13,28 +17,17 @@ import time
 import subprocess
 import webbrowser
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
-
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-try:
-    from Heti.config.safe_io import setup_safe_io, safe_print
-    from Heti.agent.core_agent import HetiAgent
-    from Heti.tools.system_tools import get_default_tools
-    from Heti.voice.pipeline import FullVoiceLoopPipeline
-    from Heti.gesture.controller import HandlessGestureController
-except ImportError:
-    from config.safe_io import setup_safe_io, safe_print
-    from agent.core_agent import HetiAgent
-    from tools.system_tools import get_default_tools
-    from voice.pipeline import FullVoiceLoopPipeline
-    from gesture.controller import HandlessGestureController
+from Heti.config.safe_io import setup_safe_io, safe_print
+from Heti.config.config_loader import Config
+from Heti.agent.core_agent import HetiAgent
+from Heti.tools.system_tools import get_default_tools
+from Heti.voice.pipeline import FullVoiceLoopPipeline
+from Heti.gesture.controller import HandlessGestureController
 
 setup_safe_io()
+
+# Resolve paths relative to THIS file (inside d:\Antigravity\Heti)
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class HetiBridgeAPI:
@@ -72,20 +65,22 @@ class HetiBridgeAPI:
 def launch_gui():
     safe_print("Starting Heti AI Desktop Assistant...")
 
-    # Initialize Agent & Tools
-    tools = get_default_tools()
-    agent = HetiAgent(tools=tools)
+    # Initialize Config & Agent (matches tray_app.py pattern)
+    config = Config()
+    agent = HetiAgent(config=config)
+    for tool in get_default_tools():
+        agent.register_tool(tool)
 
     # Initialize Voice Pipeline
-    voice_pipeline = FullVoiceLoopPipeline(agent=agent)
+    voice_pipeline = FullVoiceLoopPipeline(agent=agent, config=config)
 
     # Start Voice Listener in background daemon thread
-    voice_thread = threading.Thread(target=voice_pipeline.start, daemon=True)
+    voice_thread = threading.Thread(target=voice_pipeline.run_voice_loop, daemon=True)
     voice_thread.start()
 
     bridge = HetiBridgeAPI(agent=agent, voice_pipeline=voice_pipeline)
 
-    html_path = os.path.abspath(os.path.join(script_dir, "heti_ui.html"))
+    html_path = os.path.join(_THIS_DIR, "heti_ui.html")
     if not os.path.exists(html_path):
         safe_print(f"Error: Could not find HTML UI file at {html_path}")
         return
@@ -108,7 +103,7 @@ def launch_gui():
         # Fallback to Edge/Chrome App Mode desktop window
         edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
         chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        
+
         if os.path.exists(edge_path):
             subprocess.Popen([edge_path, f"--app=file:///{html_path}", "--window-size=520,820"])
         elif os.path.exists(chrome_path):
