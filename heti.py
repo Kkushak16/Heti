@@ -26,13 +26,13 @@ try:
     from Heti.agent.core_agent import HetiAgent
     from Heti.tools.system_tools import get_default_tools
     from Heti.voice.pipeline import FullVoiceLoopPipeline
-    from Heti.gesture.controller import get_gesture_controller
+    from Heti.gesture.controller import HandlessGestureController
 except ImportError:
     from config.safe_io import setup_safe_io, safe_print
     from agent.core_agent import HetiAgent
     from tools.system_tools import get_default_tools
     from voice.pipeline import FullVoiceLoopPipeline
-    from gesture.controller import get_gesture_controller
+    from gesture.controller import HandlessGestureController
 
 setup_safe_io()
 
@@ -43,7 +43,7 @@ class HetiBridgeAPI:
     def __init__(self, agent, voice_pipeline):
         self.agent = agent
         self.voice_pipeline = voice_pipeline
-        self.gesture_controller = get_gesture_controller()
+        self.gesture_controller = HandlessGestureController()
 
     def start_voice(self):
         safe_print("Heti UI: Voice listening active.")
@@ -64,8 +64,8 @@ class HetiBridgeAPI:
     def get_status(self):
         return {
             "agent_active": self.agent is not None,
-            "gesture_active": self.gesture_controller.is_running(),
-            "gesture_fps": self.gesture_controller.get_fps()
+            "gesture_active": self.gesture_controller.is_active(),
+            "gesture_fps": round(self.gesture_controller._fps, 1)
         }
 
 
@@ -85,7 +85,7 @@ def launch_gui():
 
     bridge = HetiBridgeAPI(agent=agent, voice_pipeline=voice_pipeline)
 
-    html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "heti_ui.html"))
+    html_path = os.path.abspath(os.path.join(script_dir, "heti_ui.html"))
     if not os.path.exists(html_path):
         safe_print(f"Error: Could not find HTML UI file at {html_path}")
         return
