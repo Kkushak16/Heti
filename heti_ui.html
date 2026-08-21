@@ -519,18 +519,24 @@
   const coreLabel = document.getElementById('coreLabel');
   const cardCamera = document.getElementById('cardCamera');
 
-  btnStart.addEventListener('click', ()=>{
+  function activateVoiceState() {
     btnStart.classList.add('on');
     btnStop.classList.remove('on');
     statusPill.classList.add('live');
     statusPill.innerHTML = '<span class="led"></span>LISTENING';
     horizonStatusText.textContent = 'LISTENING';
     coreLabel.textContent = 'LISTENING';
-
     if (window.pywebview && window.pywebview.api) {
       window.pywebview.api.start_voice();
     }
+  }
+
+  // Auto-start listening on app launch
+  window.addEventListener('DOMContentLoaded', () => {
+    activateVoiceState();
   });
+
+  btnStart.addEventListener('click', activateVoiceState);
 
   btnStop.addEventListener('click', ()=>{
     btnStop.classList.add('on');
