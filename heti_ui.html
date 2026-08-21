@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heti — AI Desktop Assistant & Control Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#030308;
+    --panel:#0b0c17;
+    --panel-2:#101223;
+    --border:rgba(255,255,255,0.07);
+    --border-hi:rgba(255,255,255,0.16);
+    --disk-1:#fff6e0;
+    --disk-2:#ffb347;
+    --disk-3:#ff5f6d;
+    --disk-4:#a06cff;
+    --disk-5:#3d5bff;
+    --text:#f2f0ff;
+    --text-dim:#8b8ca3;
+    --text-faint:#54566e;
+    --on:#ffb347;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--void);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+    user-select:none;
+  }
+  body{
+    position:relative;
+    padding:0 0 60px;
+  }
+
+  /* ---------- starfield ambient bg ---------- */
+  #stars{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+  }
+  .star{
+    position:absolute; background:#fff; border-radius:50%;
+    opacity:.5; animation:twinkle 4s ease-in-out infinite;
+  }
+  @keyframes twinkle{ 0%,100%{opacity:.15} 50%{opacity:.75} }
+
+  /* faint ambient accretion glow behind everything */
+  .ambient-glow{
+    position:fixed; top:-20%; left:50%; transform:translateX(-50%);
+    width:900px; height:900px; z-index:0; pointer-events:none;
+    background:radial-gradient(circle, rgba(255,179,71,0.06) 0%, rgba(160,108,255,0.04) 35%, transparent 70%);
+  }
+
+  /* ---------- shell ---------- */
+  .shell{
+    position:relative; z-index:1;
+    max-width:480px; margin:0 auto;
+    padding:28px 20px 0;
+  }
+  .app-header{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:22px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;
+    letter-spacing:.04em;
+  }
+  .brand .dot{
+    width:9px; height:9px; border-radius:50%;
+    background:radial-gradient(circle, var(--disk-1), var(--disk-2) 60%, var(--disk-3));
+    box-shadow:0 0 12px var(--disk-2);
+  }
+  .status-pill{
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.04em;
+    color:var(--text-dim); border:1px solid var(--border); border-radius:20px;
+    padding:5px 10px; display:flex; align-items:center; gap:6px;
+    transition:all .3s ease;
+  }
+  .status-pill .led{ width:6px; height:6px; border-radius:50%; background:var(--text-faint); }
+  .status-pill.live .led{ background:#5ee88a; box-shadow:0 0 6px #5ee88a; }
+  .status-pill.live{ color:#a9f3c1; border-color:rgba(94,232,138,0.25); }
+
+  /* ---------- tabs (gravitational lensing rule) ---------- */
+  .tabs{
+    position:relative;
+    display:flex; gap:28px;
+    margin-bottom:26px;
+  }
+  .tabs::after{
+    content:"";
+    position:absolute; left:0; right:0; bottom:0; height:1px;
+    background:var(--border);
+  }
+  .tab{
+    background:none; border:none; cursor:pointer;
+    font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600;
+    letter-spacing:.03em; text-transform:uppercase;
+    color:var(--text-faint); padding:0 0 14px; position:relative;
+  }
+  .tab.active{ color:var(--text); }
+  .tab .lens{
+    position:absolute; left:50%; bottom:-1px; transform:translateX(-50%);
+    width:0; height:6px; opacity:0;
+    background:radial-gradient(ellipse at center, var(--disk-2) 0%, transparent 72%);
+    filter:blur(2px);
+    transition:width .35s cubic-bezier(.2,.8,.2,1), opacity .35s;
+  }
+  .tab.active .lens{ width:64px; opacity:1; }
+  .tab .underline{
+    position:absolute; left:0; right:0; bottom:-1px; height:2px;
+    border-radius:2px;
+    transform:scaleX(0); transform-origin:center;
+    background:linear-gradient(90deg, transparent, var(--disk-2), var(--disk-3), transparent);
+    transition:transform .35s cubic-bezier(.2,.8,.2,1);
+  }
+  .tab.active .underline{ transform:scaleX(1); }
+
+  .frame{ display:none; animation:fadeIn .4s ease; }
+  .frame.active{ display:block; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
+
+  /* ================= FRAME 1 ================= */
+  .horizon-wrap{
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    height:230px; margin-bottom:6px;
+  }
+  .horizon{
+    position:relative; width:170px; height:170px;
+  }
+  .ring{
+    position:absolute; inset:0; border-radius:50%;
+    background:conic-gradient(from 0deg, var(--disk-4), var(--disk-5), var(--disk-3), var(--disk-2), var(--disk-1), var(--disk-2), var(--disk-3), var(--disk-5), var(--disk-4));
+    filter:blur(9px);
+    animation:spin 7s linear infinite;
+    opacity:.9;
+  }
+  .ring.slow{
+    inset:-22px; filter:blur(20px); opacity:.35;
+    animation:spin 16s linear infinite reverse;
+  }
+  .void-core{
+    position:absolute; inset:22px; border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #0a0a12, #000 65%);
+    box-shadow:inset 0 0 30px rgba(0,0,0,.9), 0 0 40px rgba(255,150,60,.15);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:var(--text-dim);
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .horizon-status{
+    text-align:center; margin-top:8px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim);
+  }
+  .horizon-status b{ color:var(--disk-2); font-weight:500; }
+
+  .power-row{
+    display:flex; gap:12px; margin:20px 0 28px;
+  }
+  .power-btn{
+    flex:1; border-radius:14px; padding:15px 16px; cursor:pointer;
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13.5px;
+    letter-spacing:.03em; text-transform:uppercase;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    border:1px solid var(--border); background:var(--panel);
+    color:var(--text-dim); transition:all .25s ease;
+  }
+  .power-btn .ic{ width:9px; height:9px; border-radius:50%; background:var(--text-faint); }
+  #btnStart.on{
+    color:#0a0602; border-color:transparent;
+    background:linear-gradient(135deg, var(--disk-1), var(--disk-2) 55%, var(--disk-3));
+    box-shadow:0 0 24px rgba(255,150,60,.35);
+  }
+  #btnStart.on .ic{ background:#0a0602; }
+  #btnStop.on{
+    color:#ffdede; border-color:rgba(255,95,109,.4);
+    background:rgba(255,95,109,.08);
+  }
+  #btnStop.on .ic{ background:var(--disk-3); box-shadow:0 0 6px var(--disk-3); }
+
+  .section-label{
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:12px;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint);
+    margin:0 2px 12px; display:flex; align-items:center; gap:10px;
+  }
+  .section-label::after{
+    content:""; flex:1; height:1px; background:var(--border);
+  }
+
+  .grid{
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;
+    margin-bottom:26px;
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:14px 12px; cursor:pointer; position:relative; overflow:hidden;
+    transition:border-color .2s ease, background .2s ease;
+  }
+  .card:hover{ border-color:var(--border-hi); }
+  .card .glyph{
+    width:26px; height:26px; margin-bottom:16px;
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    background:var(--panel-2); border:1px solid var(--border);
+    font-size:13px;
+  }
+  .card .name{
+    font-size:11.5px; font-weight:500; line-height:1.3; color:var(--text-dim);
+    margin-bottom:14px; min-height:28px;
+  }
+  .switch{
+    width:32px; height:18px; border-radius:20px; background:var(--panel-2);
+    border:1px solid var(--border); position:relative; transition:background .25s ease;
+  }
+  .switch::after{
+    content:""; position:absolute; top:2px; left:2px; width:12px; height:12px;
+    border-radius:50%; background:var(--text-faint); transition:transform .25s cubic-bezier(.3,1,.4,1), background .25s ease;
+  }
+  .card.active .switch{ background:rgba(255,179,71,0.16); border-color:rgba(255,179,71,0.4); }
+  .card.active .switch::after{
+    transform:translateX(14px); background:var(--disk-2); box-shadow:0 0 8px var(--disk-2);
+  }
+  .card.active{ background:linear-gradient(180deg, rgba(255,179,71,0.05), transparent), var(--panel); border-color:rgba(255,179,71,0.22); }
+  .card.active .name{ color:var(--text); }
+
+  .hint{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-faint);
+    text-align:center; line-height:1.6; padding:0 10px;
+  }
+
+  /* ================= FRAME 2 ================= */
+  .g-header{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:4px;
+  }
+  .g-title{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; letter-spacing:.01em;
+  }
+  .g-count{
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-faint);
+  }
+  .g-sub{
+    font-size:12.5px; color:var(--text-dim); margin-bottom:22px; line-height:1.5;
+  }
+
+  .glist{ display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+  .grow{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:14px; display:flex; align-items:center; gap:14px;
+    transition:border-color .2s ease;
+  }
+  .grow.enabled{ border-color:rgba(255,179,71,0.2); }
+  .g-check{
+    width:20px; height:20px; border-radius:6px; border:1px solid var(--border-hi);
+    background:var(--panel-2); flex-shrink:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:transparent; transition:all .2s ease;
+  }
+  .grow.enabled .g-check{
+    background:linear-gradient(135deg, var(--disk-2), var(--disk-3));
+    border-color:transparent; color:#0a0602;
+  }
+  .g-wave{
+    width:52px; height:26px; flex-shrink:0;
+  }
+  .g-wave svg{ width:100%; height:100%; }
+  .g-wave path{
+    fill:none; stroke:var(--text-faint); stroke-width:1.6; stroke-linecap:round;
+  }
+  .grow.enabled .g-wave path{ stroke:var(--disk-2); }
+
+  .g-info{ flex:1; min-width:0; }
+  .g-name{ font-size:13.5px; font-weight:600; font-family:'Space Grotesk',sans-serif; margin-bottom:2px; }
+  .g-desc{ font-size:11px; color:var(--text-faint); }
+
+  .g-action{
+    flex-shrink:0; position:relative;
+  }
+  .g-action select{
+    appearance:none; -webkit-appearance:none;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim);
+    font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    padding:7px 26px 7px 10px; border-radius:8px; cursor:pointer;
+    max-width:118px;
+  }
+  .grow.enabled .g-action select{ color:var(--text); border-color:var(--border-hi); }
+  .g-action::after{
+    content:"▾"; position:absolute; right:9px; top:50%; transform:translateY(-50%);
+    font-size:8px; color:var(--text-faint); pointer-events:none;
+  }
+
+  .add-gesture{
+    width:100%; padding:14px; border-radius:14px; margin-top:4px;
+    background:none; border:1px dashed var(--border-hi); color:var(--text-faint);
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:12px;
+    letter-spacing:.04em; text-transform:uppercase; cursor:pointer;
+    transition:all .2s ease;
+  }
+  .add-gesture:hover{ color:var(--disk-2); border-color:rgba(255,179,71,0.4); background:rgba(255,179,71,0.04); }
+
+  .cam-note{
+    display:flex; gap:10px; align-items:flex-start;
+    margin-top:22px; padding:13px 14px; border-radius:12px;
+    background:rgba(160,108,255,0.06); border:1px solid rgba(160,108,255,0.18);
+  }
+  .cam-note .ic{ font-size:14px; margin-top:1px; }
+  .cam-note p{ font-size:11px; color:#c9bdf5; line-height:1.6; }
+  .cam-note b{ color:#e4d9ff; }
+
+  @media (max-width:380px){
+    .grid{ grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stars"></div>
+<div class="ambient-glow"></div>
+
+<div class="shell">
+  <div class="app-header">
+    <div class="brand"><span class="dot"></span>HETI AI</div>
+    <div class="status-pill live" id="statusPill"><span class="led"></span>STANDBY</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-frame="f1">Control<span class="lens"></span><span class="underline"></span></button>
+    <button class="tab" data-frame="f2">Gestures<span class="lens"></span><span class="underline"></span></button>
+  </div>
+
+  <!-- ============ FRAME 1 — CONTROL ============ -->
+  <div class="frame active" id="f1">
+
+    <div class="horizon-wrap">
+      <div class="horizon">
+        <div class="ring slow"></div>
+        <div class="ring"></div>
+        <div class="void-core" id="coreLabel">HETI</div>
+      </div>
+    </div>
+    <div class="horizon-status">status — <b id="horizonStatusText">STANDBY</b> · model ready</div>
+
+    <div class="power-row">
+      <button class="power-btn on" id="btnStart"><span class="ic"></span>Start Voice</button>
+      <button class="power-btn" id="btnStop"><span class="ic"></span>Pause Voice</button>
+    </div>
+
+    <div class="section-label">Capabilities &amp; Permissions</div>
+    <div class="grid" id="cardGrid">
+      <div class="card active" data-name="Mic" id="cardMic">
+        <div class="glyph">🎙</div>
+        <div class="name">Voice Mic</div>
+        <div class="switch"></div>
+      </div>
+      <div class="card" data-name="Camera" id="cardCamera">
+        <div class="glyph">◉</div>
+        <div class="name">Handless Camera</div>
+        <div class="switch"></div>
+      </div>
+      <div class="card active" data-name="Files">
+        <div class="glyph">▤</div>
+        <div class="name">Edit / Move Files</div>
+        <div class="switch"></div>
+      </div>
+      <div class="card active" data-name="Browser">
+        <div class="glyph">◈</div>
+        <div class="name">Open Browser</div>
+        <div class="switch"></div>
+      </div>
+      <div class="card active" data-name="ScreenGuide">
+        <div class="glyph">◎</div>
+        <div class="name">Screen Context</div>
+        <div class="switch"></div>
+      </div>
+      <div class="card active" data-name="PCControl">
+        <div class="glyph">⌁</div>
+        <div class="name">Full PC Control</div>
+        <div class="switch"></div>
+      </div>
+    </div>
+
+    <p class="hint">TAP A CARD TO TOGGLE PERMISSIONS — HETI SYSTEM UPDATES INSTANTLY</p>
+  </div>
+
+  <!-- ============ FRAME 2 — GESTURES ============ -->
+  <div class="frame" id="f2">
+
+    <div class="g-header">
+      <div class="g-title">Hand Gestures</div>
+      <div class="g-count" id="gCount">5 active</div>
+    </div>
+    <p class="g-sub">Handless Mode maps webcam motion to OS mouse and desktop actions locally.</p>
+
+    <div class="glist" id="gList">
+
+      <div class="grow enabled" data-gesture="pinch">
+        <div class="g-check">✓</div>
+        <div class="g-wave"><svg viewBox="0 0 52 26"><path d="M2 13 C10 4, 16 22, 24 13 S 38 4, 44 13" /></svg></div>
+        <div class="g-info">
+          <div class="g-name">Pinch In / Out</div>
+          <div class="g-desc">Thumb + index distance</div>
+        </div>
+        <div class="g-action">
+          <select>
+            <option>Zoom In / Out</option>
+            <option>Volume</option>
+            <option>None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grow enabled" data-gesture="point">
+        <div class="g-check">✓</div>
+        <div class="g-wave"><svg viewBox="0 0 52 26"><path d="M2 20 C12 8, 20 18, 30 6 S 44 10, 50 4" /></svg></div>
+        <div class="g-info">
+          <div class="g-name">Open Hand</div>
+          <div class="g-desc">All 5 fingers extended</div>
+        </div>
+        <div class="g-action">
+          <select>
+            <option>Move Cursor</option>
+            <option>None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grow enabled" data-gesture="fist">
+        <div class="g-check">✓</div>
+        <div class="g-wave"><svg viewBox="0 0 52 26"><path d="M2 13 L10 13 C14 13, 14 5, 18 5 L26 5 C30 5, 30 21, 34 21 L42 21 C46 21, 46 13, 50 13" /></svg></div>
+        <div class="g-info">
+          <div class="g-name">Closed Fist</div>
+          <div class="g-desc">All fingers closed</div>
+        </div>
+        <div class="g-action">
+          <select>
+            <option>Drag &amp; Drop</option>
+            <option>Minimize All</option>
+            <option>None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grow enabled" data-gesture="index">
+        <div class="g-check">✓</div>
+        <div class="g-wave"><svg viewBox="0 0 52 26"><path d="M2 13 L14 13 M14 13 L8 7 M14 13 L8 19 M18 13 L50 13" /></svg></div>
+        <div class="g-info">
+          <div class="g-name">Single Index / Middle</div>
+          <div class="g-desc">Index or Middle extended</div>
+        </div>
+        <div class="g-action">
+          <select>
+            <option>Left / Right Click</option>
+            <option>None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grow enabled" data-gesture="scroll">
+        <div class="g-check">✓</div>
+        <div class="g-wave"><svg viewBox="0 0 52 26"><path d="M26 2 V24 M20 6 L26 2 L32 6 M20 20 L26 24 L32 20" /></svg></div>
+        <div class="g-info">
+          <div class="g-name">Two-Finger Scroll</div>
+          <div class="g-desc">Index + middle vertical</div>
+        </div>
+        <div class="g-action">
+          <select>
+            <option>Vertical Scroll</option>
+            <option>Double Click</option>
+            <option>None</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cam-note">
+      <div class="ic">◉</div>
+      <p><b>Handless Mode Active.</b> Gesture tracking executes 100% locally in RAM — webcam feed is never recorded or uploaded. Enable anytime via voice: <i>"Enable Handless Mode"</i>.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Ambient Starfield
+  const starsEl = document.getElementById('stars');
+  const N = 90;
+  for(let i=0;i<N;i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random()*1.6+0.6;
+    s.style.width = size+'px';
+    s.style.height = size+'px';
+    s.style.left = Math.random()*100+'%';
+    s.style.top = Math.random()*100+'%';
+    s.style.animationDelay = (Math.random()*4)+'s';
+    s.style.animationDuration = (3+Math.random()*3)+'s';
+    starsEl.appendChild(s);
+  }
+
+  // Navigation Tabs
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.frame').forEach(f=>f.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.frame).classList.add('active');
+    });
+  });
+
+  // Controls & Power Buttons
+  const btnStart = document.getElementById('btnStart');
+  const btnStop = document.getElementById('btnStop');
+  const statusPill = document.getElementById('statusPill');
+  const horizonStatusText = document.getElementById('horizonStatusText');
+  const coreLabel = document.getElementById('coreLabel');
+  const cardCamera = document.getElementById('cardCamera');
+
+  btnStart.addEventListener('click', ()=>{
+    btnStart.classList.add('on');
+    btnStop.classList.remove('on');
+    statusPill.classList.add('live');
+    statusPill.innerHTML = '<span class="led"></span>LISTENING';
+    horizonStatusText.textContent = 'LISTENING';
+    coreLabel.textContent = 'LISTENING';
+
+    if (window.pywebview && window.pywebview.api) {
+      window.pywebview.api.start_voice();
+    }
+  });
+
+  btnStop.addEventListener('click', ()=>{
+    btnStop.classList.add('on');
+    btnStart.classList.remove('on');
+    statusPill.classList.remove('live');
+    statusPill.innerHTML = '<span class="led"></span>PAUSED';
+    horizonStatusText.textContent = 'PAUSED';
+    coreLabel.textContent = 'PAUSED';
+
+    if (window.pywebview && window.pywebview.api) {
+      window.pywebview.api.stop_voice();
+    }
+  });
+
+  // Card Toggles
+  document.querySelectorAll('.card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      card.classList.toggle('active');
+      const cardName = card.dataset.name;
+      const isActive = card.classList.contains('active');
+      if (cardName === 'Camera') {
+        if (window.pywebview && window.pywebview.api) {
+          window.pywebview.api.toggle_handless(isActive);
+        }
+      }
+    });
+  });
+
+  // WebSocket Live Telemetry for Heti
+  function connectWebSocket() {
+    try {
+      const ws = new WebSocket('ws://127.0.0.1:8765');
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'status') {
+          if (data.enabled) {
+            cardCamera.classList.add('active');
+          } else {
+            cardCamera.classList.remove('active');
+          }
+        } else if (data.type === 'gesture') {
+          if (data.gesture && data.gesture !== 'NONE') {
+            coreLabel.textContent = data.gesture;
+          }
+        }
+      };
+      ws.onclose = () => setTimeout(connectWebSocket, 3000);
+    } catch(e) {}
+  }
+  connectWebSocket();
+
+  // Gesture Rows Count Refresh
+  const gCount = document.getElementById('gCount');
+  function refreshCount(){
+    const n = document.querySelectorAll('.grow.enabled').length;
+    gCount.textContent = n + ' active';
+  }
+  document.querySelectorAll('.g-check').forEach(chk=>{
+    chk.addEventListener('click', (e)=>{
+      const row = e.target.closest('.grow');
+      row.classList.toggle('enabled');
+      chk.textContent = row.classList.contains('enabled') ? '✓' : '';
+      refreshCount();
+    });
+  });
+</script>
+
+</body>
+</html>

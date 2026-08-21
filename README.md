@@ -69,6 +69,8 @@ Heti/
 ├── tools/                # Native OS automation tools
 │   └── system_tools.py
 ├── voice/                # Speech-to-Text & Text-to-Speech pipeline
+├── heti.py               # Main Desktop UI & AI Assistant GUI Application
+├── heti_ui.html          # Cosmic Desktop Control Panel interface
 ├── main.py               # Main CLI runtime script
 ├── tray_app.py           # Background system tray application
 ├── Start Heti.vbs        # Silent background launcher for Windows
@@ -83,15 +85,15 @@ Heti/
 
 * **Operating System:** Windows 10 / 11
 * **Python:** Python 3.10+
-* **Dependencies:** `opencv-python`, `mediapipe`, `pyautogui`, `pystray`, `websockets`, `pyttsx3`, `SpeechRecognition`
+* **Dependencies:** `opencv-python`, `mediapipe`, `pyautogui`, `pystray`, `websockets`, `pyttsx3`, `SpeechRecognition`, `pywebview`
 
-### Installation
+### Quick Launch
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Kkushak16/Heti.git
-   cd Heti
-   ```
+Launch the **Heti AI Assistant & Control Center**:
+```bash
+python heti.py
+```
+*(Or double-click `Start Heti.vbs` on Windows to launch silently in the background!)*
 
 2. Install Python dependencies:
    ```bash
