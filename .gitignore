@@ -27,12 +27,30 @@ ENV/
 env.bak/
 venv.bak/
 
+# Secrets, Environment & Credentials
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.pfx
+*.crt
+*.cer
+id_rsa
+id_ed25519
+*.secret
+credentials.json
+secrets.yaml
+config_secret.yaml
+
 # Logs & Local Databases
 *.log
 audit_log.jsonl
 chroma_lite/
 voice_output/
 *.wav
+*.sqlite
+*.db
 
 # IDE & System
 .vscode/
