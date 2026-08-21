@@ -1,12 +1,13 @@
 """
-Heti Voice Agent — System Tray App
-Runs as a background system tray icon (bottom-right taskbar).
-Right-click the tray icon to access all controls.
-No terminal needed once started.
+Heti Voice Agent — System Tray & Background Assistant App
+Runs silently as a background service in the Windows System Tray (bottom-right taskbar).
+Voice listening remains active even when UI window is closed.
 """
 import sys
 import os
 import threading
+import subprocess
+import webbrowser
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/.."))
 
@@ -35,12 +36,25 @@ voice_running = False
 
 
 def _build_icon_image():
-    """Creates a simple blue circle tray icon with H logo."""
+    """Load heti_logo.ico or fallback to custom PIL icon."""
+    ico_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "heti_logo.ico"))
+    png_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "heti_logo.png"))
+
+    if os.path.exists(ico_path):
+        try:
+            return Image.open(ico_path)
+        except Exception:
+            pass
+    if os.path.exists(png_path):
+        try:
+            return Image.open(png_path)
+        except Exception:
+            pass
+
     size = 64
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     draw.ellipse([4, 4, size - 4, size - 4], fill=(59, 130, 246), outline=(30, 64, 175), width=3)
-    # Draw letter "H"
     draw.line([16, 16, 16, 48], fill="white", width=5)
     draw.line([48, 16, 48, 48], fill="white", width=5)
     draw.line([16, 32, 48, 32], fill="white", width=4)
@@ -131,33 +145,26 @@ def _voice_loop_thread(icon):
     COOLDOWN_SEC = 5
 
     while voice_running:
-        # ═══════════════════════════════════════════════════════════════
-        # PHASE 1: PASSIVE MODE — only listen for wake word
-        # ═══════════════════════════════════════════════════════════════
         _wait_tts_done()
         transcript, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=3.0)
         if not transcript or not voice_running:
             continue
 
         if not _contains_wake_word(transcript):
-            # Not a wake word → ignore and keep listening passively
             continue
 
         # Wake word detected!
         voice_pipeline.tts.stop_speaking()
         safe_print(f" 🔔 [Wake Word Detected]: \"{transcript}\"")
 
-        # Check if command was included with the wake word
         command = _strip_wake_words(transcript)
 
         if not command:
-            # Pure wake word with no command — greet and ask
             greeting = f"Hi {username}, how can I help you?"
             _notify(icon, "Heti", greeting)
             voice_pipeline.tts.speak(greeting, play_audio=True, sync=True)
             _time.sleep(0.5)
 
-            # Wait for actual command
             _wait_tts_done()
             command_transcript, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=5.0)
             if not command_transcript:
@@ -169,12 +176,8 @@ def _voice_loop_thread(icon):
             if not command:
                 command = command_transcript
 
-        # ═══════════════════════════════════════════════════════════════
-        # PHASE 2: ACTIVE MODE — execute command, offer follow-up
-        # ═══════════════════════════════════════════════════════════════
         conversation_active = True
         while conversation_active and voice_running:
-            # Dedup check
             now = _time.time()
             cmd_lower = command.lower().strip()
             if cmd_lower == _last_command and (now - _last_command_time) < COOLDOWN_SEC:
@@ -188,7 +191,6 @@ def _voice_loop_thread(icon):
             safe_print(f" 📝 [Command]: \"{command}\"")
             _notify(icon, "Heti Heard", f"\"{command}\"")
 
-            # Execute the command
             _notify(icon, "Heti Working", "Processing...")
             response = agent.run_turn(command)
 
@@ -197,31 +199,25 @@ def _voice_loop_thread(icon):
             voice_pipeline.tts.speak(response, play_audio=True, sync=True)
             _time.sleep(0.5)
 
-            # Offer follow-up with exact phrase requested by user
             _wait_tts_done()
             voice_pipeline.tts.speak("For any other help, I'm here Heti.", play_audio=True, sync=True)
             _time.sleep(0.5)
 
-            # Wait for follow-up command with 2-stage active listening window
             _wait_tts_done()
-            safe_print(" 🎙️ [Active Conversation Mode] Listening for follow-up (no wake word needed)...")
+            safe_print(" 🎙️ [Active Conversation Mode] Listening for follow-up...")
             followup, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=4.5)
             if not followup:
-                # Stage 2 retry window
                 safe_print(" ⏳ [Active Conversation Mode] Still listening for follow-up...")
                 followup, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=4.5)
 
             if not followup:
-                # Silence — end conversation, go back to passive mode
                 safe_print(" 🔇 [Voice Loop] No follow-up detected — conversation closed. Reverting to passive wake-word mode.")
                 conversation_active = False
                 break
 
-            # Check if it's a new wake word (restart conversation) or a direct command
             if _contains_wake_word(followup):
                 command = _strip_wake_words(followup)
                 if not command:
-                    # Just said "Heti" again with no command
                     voice_pipeline.tts.speak("Yes? What can I do for you?", play_audio=True, sync=True)
                     _time.sleep(0.5)
                     _wait_tts_done()
@@ -231,15 +227,27 @@ def _voice_loop_thread(icon):
                     else:
                         conversation_active = False
                         break
-                # else command already extracted, loop continues
             else:
-                # Direct follow-up command without wake word
                 command = followup
 
     safe_print(" 🛑 [Voice Loop] Stopped.")
 
 
 # ─── Tray Menu Actions ───────────────────────────────────────────────────────
+def action_open_dashboard(icon=None, item=None):
+    """Open the Desktop GUI dashboard window (closing this window will NOT stop voice assistant)."""
+    html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "heti_ui.html"))
+    edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+    if os.path.exists(edge_path):
+        subprocess.Popen([edge_path, f"--app=file:///{html_path}", "--window-size=520,820"])
+    elif os.path.exists(chrome_path):
+        subprocess.Popen([chrome_path, f"--app=file:///{html_path}", "--window-size=520,820"])
+    else:
+        webbrowser.open(f"file:///{html_path}")
+
+
 def action_start_voice(icon, item):
     global voice_thread, voice_running
     if voice_running:
@@ -248,15 +256,17 @@ def action_start_voice(icon, item):
     voice_running = True
     voice_thread = threading.Thread(target=_voice_loop_thread, args=(icon,), daemon=True)
     voice_thread.start()
-    icon.title = "Heti Agent [LISTENING]"
-    _notify(icon, "Heti", "Voice listening started. Speak your command!")
+    if icon:
+        icon.title = "Heti Agent [LISTENING]"
+    _notify(icon, "Heti", "Voice listening started. Speak 'Hey Heti' anytime!")
 
 
 def action_stop_voice(icon, item):
     global voice_running
     voice_running = False
-    icon.title = "Heti Agent [Idle]"
-    _notify(icon, "Heti", "Voice listening stopped.")
+    if icon:
+        icon.title = "Heti Agent [Idle]"
+    _notify(icon, "Heti", "Voice listening paused.")
 
 
 def action_system_stats(icon, item):
@@ -268,7 +278,8 @@ def action_system_stats(icon, item):
         f"Disk Free: {stats.get('disk', {}).get('free_gb', '?')}GB"
     )
     _notify(icon, "System Stats", msg)
-    voice_pipeline.tts.speak(f"CPU is at {stats.get('cpu_percent')} percent. RAM free: {stats.get('memory', {}).get('free_mb')} megabytes.", play_audio=True)
+    if voice_pipeline and voice_pipeline.tts:
+        voice_pipeline.tts.speak(f"CPU is at {stats.get('cpu_percent')} percent. RAM free: {stats.get('memory', {}).get('free_mb')} megabytes.", play_audio=True)
 
 
 def action_toggle_handless(icon, item):
@@ -295,7 +306,8 @@ def action_quit(icon, item):
         pass
     if kb_watcher:
         kb_watcher.stop()
-    icon.stop()
+    if icon:
+        icon.stop()
 
 
 # ─── Build & Run Tray ────────────────────────────────────────────────────────
@@ -303,6 +315,8 @@ def run_tray_app():
     _initialize_agent()
 
     menu = pystray.Menu(
+        pystray.MenuItem("🖥️ Open Dashboard UI", action_open_dashboard),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem("🎙️ Start Voice Listening", action_start_voice),
         pystray.MenuItem("🛑 Stop Voice Listening", action_stop_voice),
         pystray.Menu.SEPARATOR,
@@ -317,16 +331,15 @@ def run_tray_app():
     icon = pystray.Icon(
         name="HetiAgent",
         icon=icon_img,
-        title="Heti Agent [Idle]",
+        title="Heti Agent [Active]",
         menu=menu
     )
 
-    # Auto-notify on launch and auto-start voice listening thread
     def _on_launch():
-        _notify(icon, "Heti Agent Ready", f"Tier: {config.active_tier.upper()} | Voice listening active.")
+        _notify(icon, "Heti Agent Ready", f"Tier: {config.active_tier.upper()} | Say 'Hey Heti' anytime!")
         action_start_voice(icon, None)
 
-    threading.Timer(2.0, _on_launch).start()
+    threading.Timer(1.5, _on_launch).start()
 
     icon.run()
 
