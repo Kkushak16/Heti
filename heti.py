@@ -1,17 +1,18 @@
 """
 Heti AI Desktop Assistant & Control Center
 Main desktop GUI application entry point for Heti.
-
-Launches the Heti Desktop UI (heti_ui.html) inside a native window
-with full real-time bindings to Heti's Voice Pipeline and Handless Gesture Engine.
-
-NOTE: This file must be imported/run from the PARENT directory (d:\\Antigravity)
-      so that 'from Heti.xxx' package imports resolve correctly.
-      Use run_heti.py or the Start Heti.vbs launcher.
 """
 
 import os
 import sys
+
+# Ensure parent directory (d:\Antigravity) is in sys.path BEFORE any Heti package imports.
+# This guarantees 'from Heti.xxx import ...' resolves regardless of how or where this script is executed.
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_parent_dir = os.path.dirname(_current_dir)
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+
 import threading
 import time
 import subprocess
@@ -26,8 +27,7 @@ from Heti.gesture.controller import HandlessGestureController
 
 setup_safe_io()
 
-# Resolve paths relative to THIS file (inside d:\Antigravity\Heti)
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_THIS_DIR = _current_dir
 
 
 class HetiBridgeAPI:
@@ -65,7 +65,7 @@ class HetiBridgeAPI:
 def launch_gui():
     safe_print("Starting Heti AI Desktop Assistant...")
 
-    # Initialize Config & Agent (matches tray_app.py pattern)
+    # Initialize Config & Agent
     config = Config()
     agent = HetiAgent(config=config)
     for tool in get_default_tools():
