@@ -139,14 +139,19 @@ class FullVoiceLoopPipeline:
 
             safe_print(f" 🎙️ Recording", end="", flush=True)
             recording = sd.rec(int(duration_sec * samplerate), samplerate=samplerate, channels=1, dtype='int16')
-            for i in range(int(duration_sec)):
-                time_module.sleep(1)
+            
+            # Sleep in 0.5s increments to show progress smoothly
+            elapsed = 0.0
+            while elapsed < duration_sec:
+                time_module.sleep(0.5)
+                elapsed += 0.5
                 safe_print(".", end="", flush=True)
             sd.wait()
             safe_print(" done!")
 
             max_amp = np.max(np.abs(recording))
-            if max_amp < 10:
+            # Increase silence threshold to 300 to filter room hum/static
+            if max_amp < 300:
                 safe_print(" ⚠️ [STT] Silence detected — no voice captured.")
                 return "", 0.0
 
@@ -167,9 +172,15 @@ class FullVoiceLoopPipeline:
                 except Exception:
                     pass
 
-            # Filter out whisper halluncinations on near silence
+            # Filter out whisper hallucinations on near silence
             clean_text = transcript.strip()
-            if clean_text in [".", ",", "!", "?", "...", "[BLANK_AUDIO]", "[MUSIC]", "[NOISE]"]:
+            # Common whisper hallucinations on hum
+            hallucinations = [
+                ".", ",", "!", "?", "...", "[BLANK_AUDIO]", "[MUSIC]", "[NOISE]",
+                "you", "Thank you.", "thank you.", "Thank you", "thank you",
+                "Thank you!", "thank you!", "Bye.", "bye."
+            ]
+            if clean_text in hallucinations:
                 clean_text = ""
 
             return clean_text, latency

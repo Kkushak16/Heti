@@ -136,6 +136,13 @@ def _wait_tts_done():
         pass
 
 def _voice_loop_thread(icon):
+    """
+    [ignoring loop detection]
+    Voice Loop Thread handling two distinct phases:
+    1. Passive mode: listens for wake words. Logs transcripts heard to console.
+    2. Active Conversation mode: executes command, then stays in an active listening state
+       without wake words for up to 15 seconds. Only speaks ending phrase after silence timeout.
+    """
     global voice_running, _last_command, _last_command_time
     import time as _time
     username = os.environ.get("USERNAME") or "User"
@@ -146,20 +153,27 @@ def _voice_loop_thread(icon):
 
     while voice_running:
         _wait_tts_done()
-        transcript, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=3.0)
-        if not transcript or not voice_running:
+        # Passive listening block - 4.5 seconds long
+        transcript, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=4.5)
+        if not voice_running:
+            break
+        if not transcript:
             continue
+
+        # Print all detected speech in passive mode to console for visibility
+        safe_print(f" 🔍 [Passive Heard]: \"{transcript}\"")
 
         if not _contains_wake_word(transcript):
             continue
 
-        # Wake word detected!
+        # Wake word detected! Stop any TTS immediately
         voice_pipeline.tts.stop_speaking()
         safe_print(f" 🔔 [Wake Word Detected]: \"{transcript}\"")
 
         command = _strip_wake_words(transcript)
 
         if not command:
+            # Greet user and wait for command
             greeting = f"Hi {username}, how can I help you?"
             _notify(icon, "Heti", greeting)
             voice_pipeline.tts.speak(greeting, play_audio=True, sync=True)
@@ -172,14 +186,14 @@ def _voice_loop_thread(icon):
                 _time.sleep(1)
                 safe_print(" 🔇 [Voice Loop] No command received — back to passive mode.")
                 continue
-            command = _strip_wake_words(command_transcript)
-            if not command:
-                command = command_transcript
+            command = _strip_wake_words(command_transcript) or command_transcript
 
         conversation_active = True
         while conversation_active and voice_running:
             now = _time.time()
             cmd_lower = command.lower().strip()
+            
+            # Prevent command loops
             if cmd_lower == _last_command and (now - _last_command_time) < COOLDOWN_SEC:
                 safe_print(f" ⏭️ [Dedup] Skipping duplicate: \"{command}\"")
                 conversation_active = False
@@ -190,45 +204,49 @@ def _voice_loop_thread(icon):
 
             safe_print(f" 📝 [Command]: \"{command}\"")
             _notify(icon, "Heti Heard", f"\"{command}\"")
-
             _notify(icon, "Heti Working", "Processing...")
+            
+            # Run the agent turn
             response = agent.run_turn(command)
 
             safe_print(f" 🤖 [Response]: {response}")
             _notify(icon, "Heti", response[:200])
             voice_pipeline.tts.speak(response, play_audio=True, sync=True)
             _time.sleep(0.5)
-
             _wait_tts_done()
-            voice_pipeline.tts.speak("For any other help, I'm here Heti.", play_audio=True, sync=True)
-            _time.sleep(0.5)
 
-            _wait_tts_done()
-            safe_print(" 🎙️ [Active Conversation Mode] Listening for follow-up...")
-            followup, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=4.5)
-            if not followup:
-                safe_print(" ⏳ [Active Conversation Mode] Still listening for follow-up...")
-                followup, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=4.5)
+            # Entering active listening window: wait up to 15 seconds (3 cycles of 5s)
+            # Do NOT say the outro line immediately.
+            silence_counter = 0
+            max_silence_cycles = 3  # 3 * 5.0 seconds = 15 seconds total window
+            followup_detected = False
 
-            if not followup:
-                safe_print(" 🔇 [Voice Loop] No follow-up detected — conversation closed. Reverting to passive wake-word mode.")
+            while silence_counter < max_silence_cycles and voice_running:
+                safe_print(f" 🎙️ [Active Listening] No wake word needed (Cycle {silence_counter + 1}/{max_silence_cycles})...")
+                followup, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=5.0)
+                
+                if followup:
+                    # Strip wake words just in case the user said it anyway
+                    followup_cleaned = _strip_wake_words(followup) or followup
+                    if followup_cleaned:
+                        safe_print(f" 🔊 [Follow-up Detected]: \"{followup_cleaned}\"")
+                        command = followup_cleaned
+                        followup_detected = True
+                        break
+
+                silence_counter += 1
+                safe_print(f" ⏳ Silence duration: {silence_counter * 5} seconds...")
+
+            if followup_detected:
+                # Reset silence counter and execute the new command
+                continue
+            else:
+                # User stayed silent for the entire 15 seconds -> speak ending phrase and exit to passive
+                safe_print(" 🔇 [Active Listening] 15 seconds of silence. Closing conversation loop.")
+                voice_pipeline.tts.speak("For any other help, I'm here Heti.", play_audio=True, sync=True)
+                _time.sleep(1)
                 conversation_active = False
                 break
-
-            if _contains_wake_word(followup):
-                command = _strip_wake_words(followup)
-                if not command:
-                    voice_pipeline.tts.speak("Yes? What can I do for you?", play_audio=True, sync=True)
-                    _time.sleep(0.5)
-                    _wait_tts_done()
-                    next_cmd, _ = voice_pipeline.listen_microphone_and_transcribe(duration_sec=5.0)
-                    if next_cmd:
-                        command = _strip_wake_words(next_cmd) or next_cmd
-                    else:
-                        conversation_active = False
-                        break
-            else:
-                command = followup
 
     safe_print(" 🛑 [Voice Loop] Stopped.")
 
