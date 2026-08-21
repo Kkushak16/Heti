@@ -10,6 +10,7 @@ import os
 import sys
 import threading
 import time
+import subprocess
 import webbrowser
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/.."))
@@ -18,7 +19,7 @@ from Heti.config.safe_io import setup_safe_io, safe_print
 setup_safe_io()
 
 from Heti.agent.core_agent import HetiAgent
-from Heti.tools.system_tools import get_default_tools, toggle_handless_mode, get_gesture_status
+from Heti.tools.system_tools import get_default_tools
 from Heti.voice.pipeline import FullVoiceLoopPipeline
 from Heti.gesture.controller import get_gesture_controller
 
@@ -32,10 +33,7 @@ class HetiBridgeAPI:
         self.gesture_controller = get_gesture_controller()
 
     def start_voice(self):
-        safe_print("Heti UI: Voice listening started.")
-        if self.voice_pipeline:
-            # Voice pipeline runs in continuous loop
-            pass
+        safe_print("Heti UI: Voice listening active.")
         return {"status": "success", "message": "Voice listening active"}
 
     def stop_voice(self):
@@ -59,7 +57,7 @@ class HetiBridgeAPI:
 
 
 def launch_gui():
-    safe_print("Starting Heti AI Assistant & Desktop Control Center...")
+    safe_print("Starting Heti AI Desktop Assistant...")
 
     # Initialize Agent & Tools
     tools = get_default_tools()
@@ -79,7 +77,7 @@ def launch_gui():
         safe_print(f"Error: Could not find HTML UI file at {html_path}")
         return
 
-    # Try pywebview native desktop window
+    # Native PyWebView Desktop Window
     try:
         import webview
         window = webview.create_window(
@@ -93,8 +91,21 @@ def launch_gui():
         )
         webview.start(debug=False)
     except Exception as e:
-        safe_print(f"Native webview fallback triggered ({e}). Launching default desktop window...")
-        webbrowser.open(f"file:///{html_path}")
+        safe_print(f"Native webview fallback triggered: {e}. Launching app window...")
+        # Fallback to Edge/Chrome App Mode desktop window
+        edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+        
+        if os.path.exists(edge_path):
+            subprocess.Popen([edge_path, f"--app=file:///{html_path}", "--window-size=520,820"])
+        elif os.path.exists(chrome_path):
+            subprocess.Popen([chrome_path, f"--app=file:///{html_path}", "--window-size=520,820"])
+        else:
+            webbrowser.open(f"file:///{html_path}")
+
+        # Keep main thread alive for background voice loop
+        while True:
+            time.sleep(1)
 
 
 if __name__ == "__main__":
