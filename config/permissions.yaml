@@ -1,0 +1,59 @@
+# Jarvis / Heti Tool Permissions & Security Policy
+
+# Global Security Settings
+strict_mode: true
+allow_unlisted_tools: false
+
+# Tool-Specific Security Profiles
+tools:
+  get_system_stats:
+    permission: "READ_ONLY"
+    allowed: true
+    requires_confirmation: false
+    category: "SYSTEM_INFO"
+
+  list_directory:
+    permission: "READ_ONLY"
+    allowed: true
+    requires_confirmation: false
+    category: "FILE_SYSTEM"
+
+  execute_shell_command:
+    permission: "DESTRUCTIVE"
+    allowed: false
+    requires_confirmation: true
+    category: "SYSTEM_EXECUTION"
+
+  delete_file:
+    permission: "DESTRUCTIVE"
+    allowed: true
+    requires_confirmation: true
+    category: "FILE_SYSTEM"
+
+  open_application:
+    permission: "SYSTEM_EXECUTION"
+    allowed: true
+    requires_confirmation: false
+    category: "SYSTEM_EXECUTION"
+
+  organize_folder:
+    permission: "FILE_SYSTEM"
+    allowed: true
+    requires_confirmation: false
+    category: "FILE_SYSTEM"
+
+  move_file:
+    permission: "FILE_SYSTEM"
+    allowed: true
+    requires_confirmation: true
+    category: "FILE_SYSTEM"
+
+  inspect_downloaded_file:
+    permission: "READ_ONLY"
+    allowed: true
+    requires_confirmation: false
+    category: "FILE_SYSTEM"
+
+
+
+

@@ -1,0 +1,42 @@
+# Jarvis Local Assistant Configuration
+
+# Active Tier: 'full' (7B/8B models, 4k ctx) or 'lite' (1.5B/3B models, 2k ctx)
+tier: "lite"
+
+system:
+  ollama_host: "http://127.0.0.1:11434"
+
+models:
+  full:
+    llm_name: "qwen2.5:7b"       # Alternative: "llama3.1:8b"
+    num_ctx: 4096
+    temperature: 0.2
+    stt_model: "base"            # Faster-Whisper base model (~145MB, higher accuracy)
+    stt_compute_type: "int8"     # int8 works on CPU without hang
+    tts_voice: "en_US-lessac-medium" # Piper TTS medium voice
+    wake_word_engine: "openwakeword" # OpenWakeWord
+    wake_words: ["hey_heti", "heti"]
+    auto_unload_stt: false        # Keep model in RAM between turns (no reload delay)
+    # RAG Settings
+    embedding_model: "nomic-embed-text"
+    rag_top_k: 5
+    rag_chunk_size: 512
+    rag_persist_mode: "memory"
+    rag_summarize_retrieved: false
+
+  lite:
+    llm_name: "qwen2.5:1.5b"     # Fast 1.5B model for instant responses (~1s latency)
+    num_ctx: 2048
+    temperature: 0.1
+    stt_model: "base"            # Faster-Whisper base model for clear speech recognition
+    stt_compute_type: "int8"     # Int8 quantization for fast execution
+    tts_voice: "en_US-lessac-low" # Piper TTS low/x-low (~20-60MB ONNX)
+    wake_word_engine: "porcupine" # Porcupine (near-zero RAM footprint)
+    wake_words: ["jarvis", "heti"]
+    auto_unload_stt: false       # Keep STT loaded for instant turn-taking
+    # RAG Settings
+    embedding_model: "all-MiniLM-L6-v2" # Ultra-lightweight (~90MB)
+    rag_top_k: 2
+    rag_chunk_size: 256          # Smaller chunks to reduce memory spikes
+    rag_persist_mode: "disk_only" # On-disk persistence (no in-memory cache)
+    rag_summarize_retrieved: true # Summarize retrieved chunks before passing to small LLM

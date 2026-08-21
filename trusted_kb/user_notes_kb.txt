@@ -1,0 +1,26 @@
+# REHS System Documentation
+The REHS (Recirculating Eco-Heat System) bypass valve operates on a differential pressure relief mechanism.
+When downstream loop pressure exceeds 45 PSI or water temperature surpasses 85°C, the internal diaphragm spring compresses.
+This opens the secondary return line, allowing high-temperature fluid to bypass the main heat exchanger, preventing thermal shock and pump cavitation.
+
+---
+
+# IoT Flood Monitoring Project — Cost Breakdown
+Total Project Budget: $4,250
+1. Hardware & Sensors: $1,800
+   - Ultrasonic water level sensors (12 units): $960
+   - ESP32 LoRa Gateway nodes (4 units): $440
+   - Solar panels & LiFePO4 batteries: $400
+2. Cloud Infrastructure & Connectivity: $850
+   - AWS IoT Core & DynamoDB (1-year projection): $450
+   - Cellular SIM data plans (12 months): $400
+3. Field Enclosures & Mounting: $600
+   - IP67 weatherproof housing & poles: $600
+4. Prototyping & Contingency: $1,000
+
+---
+
+# Ekam Platform — Rate Limiting Architecture
+Ekam implements a dual-layer token bucket rate limiter powered by Redis.
+- Socket.IO Real-time Events: Capped at 30 messages per minute per active socket connection. Exceeding this triggers a 429 Warning event and temporary socket throttling for 15 seconds.
+- REST API Auth & Chat Endpoints: Capped at 100 requests per 15-minute window per IP address (`express-rate-limit`). Burst requests above 120 trigger an immediate HTTP 429 Too Many Requests response.
